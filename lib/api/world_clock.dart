@@ -5,42 +5,31 @@ import 'package:http/http.dart' as http;
 import 'package:http/src/response.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:world_clock_api/model/location_model.dart';
 
 class GetData extends ChangeNotifier {
   String showDate = '';
-  void getTime({required BuildContext context}) async {
-    String locationName = context.read<LocationSearch>().locationName;
-
-    print(locationName);
-
+  String showName = '';
+  void getTime(
+      {required BuildContext context,
+      required String name,
+      required String locationName}) async {
+    // Get Data from api by post method
     Response getResponse = await ApiData().postApi(
         endPoint: "/world-time/datetime-now",
-        body: '{"datetime_format":"iso8601","timezones":["$locationName"]}');
+        body: '{"datetime_format":"iso8601","timezones":["$name"]}');
 
-    String location = jsonDecode(getResponse.body)["data"][locationName];
+    String location = jsonDecode(getResponse.body)["data"][name];
+    // 2023-04-02T23:52:06.652665-05:00
 
-    print(location);
-
-    // print(DateTime.parse(location).toLocal());
-    // print(DateTime.parse("2023-03-25T18:07:35.914149+07:00").toLocal());
-
-    String showDate1 =
-        DateFormat.yMMMd().add_jm().format(DateTime.parse(location));
-    String showDate2 = DateFormat.yMMMd()
-        .add_jm()
-        .format(DateTime.parse("2023-03-25T18:07:35.914149+07:00"));
-
-    print(showDate1);
-    print(showDate2);
-
-    // showDate =
-    //     DateFormat.yMMMd().add_jm().format(DateTime(location).timeZoneOffset);
-
+    // now is already calculate with Offset time
+    DateTime now = timeConvert(location: location);
+    showDate = DateFormat("hh:mm a").format(now);
+    showName = locationName;
     notifyListeners();
   }
 }
 
+// For Api address
 class ApiData {
   String _baseUrl = "https://worldtime5.p.rapidapi.com/api";
   final Map<String, String> _header = {};
@@ -73,9 +62,25 @@ class ApiData {
     _header["X-RapidAPI-Key"] = _apiKey;
     _header["X-RapidAPI-Host"] = _apiHost;
 
-    // _body = '{"datetime_format":"iso8601","timezones":["America/Chicago"]}';
-
     return await http.post(Uri.parse("$_baseUrl$endPoint"),
         headers: _header, body: body);
   }
+}
+
+// Funtion For Offset adding and subtract to get Real Time
+DateTime timeConvert({required String location}) {
+  //  location String is UTC time string
+  String newString = location.substring(location.length - 6); // Get Offset
+  int offsetHour = int.parse(newString.substring(1, 3)); // Offset hour => 07
+  int offsetMin = int.parse(newString.substring(4, 6)); // Offset minute => 30
+
+  DateTime now = DateTime.parse(location);
+
+  if (newString[0] == "+") {
+    now = now.add(Duration(hours: offsetHour, minutes: offsetMin));
+  } else if (newString[0] == "-") {
+    now = now.subtract(Duration(hours: offsetHour, minutes: offsetMin));
+  }
+
+  return now;
 }
